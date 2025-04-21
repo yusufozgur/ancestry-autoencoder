@@ -7,9 +7,22 @@ from os.path import isfile
 from pathlib import Path
 import typer
 from backend.VCFManager import VCFManager, VCFNotPhasedError, VCFSchemaValidationError
-
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class State(BaseModel):
     current_dir: str = os.getcwd()
@@ -30,20 +43,22 @@ def read_root():
 #get_cwd, list_dir, change_dir will be used for traversing the filesystem to choose
 #   files for choose_vcf, choose_annotation
 
-@app.get("/fs/get_cwd")
+@app.get("/fs/get_cwd", response_model=str)
 def get_current_dir():
-    return {"current_dir": global_state.current_dir}
+    return global_state.current_dir
 
-@app.get("/fs/list_dir")
-def list_dir(path: str | None = None):
+@app.get("/fs/list_dir", response_model=list[dict[str,str]])
+def list_dir():
     ls = os.listdir()
     #annotate which are files
-    ls_w_file_info = [[x,"file"] if isfile(x) else [x,"dir"] for x in ls]
+    ls_w_file_info = [{"name": x,"type": "file", "abspath": os.path.abspath(os.path.join(global_state.current_dir, x))} if isfile(x) else {"name": x,"type": "directory", "abspath": os.path.abspath(os.path.join(global_state.current_dir, x))} for x in ls]
     return ls_w_file_info
 
 @app.put("/fs/change_dir/{newdir}")
 def change_dir(newdir: str):
+    print(f"before:{global_state.current_dir}")
     global_state.current_dir = newdir
+    print(f"after:{global_state.current_dir}")
     return {"current_dir": global_state.current_dir}
 
 @app.put("/choose_vcf/{vcf_path}", response_model=SuccessErrorReturn)

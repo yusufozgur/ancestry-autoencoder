@@ -6,12 +6,14 @@ import { Folder, FileText, ChevronLeft, RefreshCw } from 'lucide-react';
 type DirectoryItem = {
   name: string;
   type: string;
-  size?: string;
+  abspath: string;
 };
 
 type FileBrowserProps = {
-  startingPath: string;
-  getDirectoryContents: (path: string) => DirectoryItem[];
+  currentPath: string;
+  directoryContents: DirectoryItem[];
+  onFileItemClick: (filename: string) => void;
+  navigateToDirectory: (abspath: string) => void;
 };
 
 // Sub-component Props Types
@@ -20,15 +22,14 @@ type NavigationBarProps = {
   displayPath: string;
   navigateUp: () => void;
   refreshDirectory: () => void;
-  isLoading: boolean;
 };
 
 type DirectoryContentsProps = {
-  isLoading: boolean;
   directoryContents: DirectoryItem[];
   selectedItem: string | null;
   setSelectedItem: (item: string) => void;
   navigateToDirectory: (dirName: string) => void;
+  onFileItemClick: (filename: string) => void;
 };
 
 type DirectoryItemProps = {
@@ -42,63 +43,24 @@ type StatusBarProps = {
 };
 
 // Main Component
-export default function FileBrowser({ startingPath, getDirectoryContents }: FileBrowserProps) {
+export default function FileBrowser(
+    {
+      currentPath, 
+      directoryContents,
+      onFileItemClick,
+      navigateToDirectory
+    }: FileBrowserProps) {
   // State management
-  const [currentPath, setCurrentPath] = useState<string>('/');
-  const [directoryContents, setDirectoryContents] = useState<DirectoryItem[]>(getDirectoryContents(startingPath));
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-
-  // Load directory contents when path changes
-  useEffect(() => {
-    const loadDirectoryContents = async () => {
-      setIsLoading(true);
-      try {
-        setDirectoryContents(getDirectoryContents(currentPath));
-      } catch (error) {
-        console.error('Error loading directory contents:', error);
-        setDirectoryContents(getDirectoryContents(currentPath));
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    loadDirectoryContents();
-  }, [currentPath, getDirectoryContents]);
-
-  // Navigation functions
-  const navigateToDirectory = (dirName: string) => {
-    const newPath = currentPath === '/' 
-      ? `/${dirName}` 
-      : `${currentPath}/${dirName}`;
-    setCurrentPath(newPath);
-    setSelectedItem(null);
-  };
 
   const navigateUp = () => {
     if (currentPath === '/') return;
-    
-    const pathParts = currentPath.split('/').filter(Boolean);
-    pathParts.pop();
-    const newPath = pathParts.length === 0 ? '/' : `/${pathParts.join('/')}`;
-    setCurrentPath(newPath);
-    setSelectedItem(null);
+    // ...
   };
 
   const refreshDirectory = async () => {
-    setIsLoading(true);
-    try {
-      setDirectoryContents(getDirectoryContents(startingPath));
-    } catch (error) {
-      console.error('Error refreshing directory contents:', error);
-    } finally {
-      setIsLoading(false);
-      setSelectedItem(null);
-    }
+    
   };
-
-  // Format the path for display
-  const displayPath = currentPath === '/' ? '/' : currentPath;
 
   // Render component
   return (
@@ -106,19 +68,17 @@ export default function FileBrowser({ startingPath, getDirectoryContents }: File
       {/* Navigation bar */}
       <NavigationBar 
         currentPath={currentPath}
-        displayPath={displayPath}
         navigateUp={navigateUp}
         refreshDirectory={refreshDirectory}
-        isLoading={isLoading}
       />
       
       {/* Directory contents */}
       <DirectoryContents 
-        isLoading={isLoading}
         directoryContents={directoryContents}
         selectedItem={selectedItem}
         setSelectedItem={setSelectedItem}
         navigateToDirectory={navigateToDirectory}
+        onFileItemClick={onFileItemClick}
       />
       
       {/* Status bar */}
@@ -130,10 +90,8 @@ export default function FileBrowser({ startingPath, getDirectoryContents }: File
 // Sub-components
 function NavigationBar({ 
   currentPath, 
-  displayPath, 
   navigateUp, 
   refreshDirectory,
-  isLoading
 }: NavigationBarProps) {
   return (
     <div className="flex items-center w-full justify-between p-2 bg-gray-100 border-b">
@@ -146,30 +104,28 @@ function NavigationBar({
           <ChevronLeft size={18} />
         </button>
         <span className="text-sm font-medium truncate">
-          {displayPath}
+          {currentPath}
         </span>
       </div>
       <button 
         className="p-1 rounded hover:bg-gray-200"
         onClick={refreshDirectory}
-        disabled={isLoading}
       >
-        <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
       </button>
     </div>
   );
 }
 
 function DirectoryContents({ 
-  isLoading, 
   directoryContents, 
   selectedItem,
   setSelectedItem,
-  navigateToDirectory
+  navigateToDirectory,
+  onFileItemClick
 }: DirectoryContentsProps) {
   return (
     <div className="overflow-auto h-fit">
-      {isLoading ? (
+      {false ? (
         <div className="p-4 text-center text-gray-500">Loading...</div>
       ) : directoryContents.length > 0 ? (
         <ul className="divide-y">
@@ -181,7 +137,9 @@ function DirectoryContents({
               onSelect={() => {
                 setSelectedItem(item.name);
                 if (item.type === 'directory') {
-                  navigateToDirectory(item.name);
+                    navigateToDirectory(item.abspath);
+                } else {
+                    onFileItemClick(item.name)
                 }
               }}
             />
@@ -208,7 +166,6 @@ function DirectoryItem({ item, isSelected, onSelect }: DirectoryItemProps) {
         <FileText size={18} className="text-gray-500 mr-2" />
       )}
       <div className="flex-1 truncate">{item.name}</div>
-      {item.size && <div className="text-xs text-gray-500">{item.size}</div>}
     </li>
   );
 }
