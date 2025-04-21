@@ -1,9 +1,13 @@
 from dataclasses import dataclass
 from typing import Union
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket
 from pydantic import BaseModel
 import os
 from os.path import isfile
+from pathlib import Path
+import typer
+from backend.VCFManager import VCFManager, VCFNotPhasedError, VCFSchemaValidationError
+
 
 app = FastAPI()
 
@@ -11,6 +15,7 @@ class State(BaseModel):
     current_dir: str = os.getcwd()
     vcf_path: str | None = None
     annotation_txt_path: str | None = None
+    sample_names: list[str] | None = None
 global_state = State()
 
 @dataclass
@@ -33,8 +38,8 @@ def get_current_dir():
 def list_dir(path: str | None = None):
     ls = os.listdir()
     #annotate which are files
-    ls = [[x,"file"] if isfile(x) else [x,"dir"] for x in ls]
-    return ls
+    ls_w_file_info = [[x,"file"] if isfile(x) else [x,"dir"] for x in ls]
+    return ls_w_file_info
 
 @app.put("/fs/change_dir/{newdir}")
 def change_dir(newdir: str):
@@ -45,7 +50,16 @@ def change_dir(newdir: str):
 def choose_vcf(vcf_path: str, tmp: str):
     if isfile(vcf_path):
         global_state.vcf_path = vcf_path
-        return SuccessErrorReturn(success=True, error=None)
+        try:
+            vcf_manager = VCFManager(vcf_path)
+            return SuccessErrorReturn(success=True, error=None)
+        except VCFSchemaValidationError as e:
+            return SuccessErrorReturn(success=False, error=f"VCFSchemaValidationError: {e}")
+        except VCFNotPhasedError as e:
+            return SuccessErrorReturn(success=False, error=f"VCFNotPhasedError error: {e}")
+        except Exception as e:
+            return SuccessErrorReturn(success=False, error=f"An unexpected error occurred: {e}")
+
     else:
         return SuccessErrorReturn(success=False, error="The specified VCF path does not exist or is not a file.")
     
@@ -57,3 +71,18 @@ def choose_annotation_file(annotation_path: str, tmp: str):
         return SuccessErrorReturn(success=True, error=None)
     else:
         return SuccessErrorReturn(success=False, error="The specified annotation file path does not exist or is not a file.")
+    
+
+def get_sample_names():
+    pass
+
+@app.websocket("/train")
+async def train(websocket: WebSocket):
+    """
+    Return real time training info
+    """
+    #TODO: call for training loop
+    await websocket.accept()
+    while True:
+        data = await websocket.receive_text()
+        await websocket.send_text(f"Message text was: {data}")

@@ -6,14 +6,27 @@ Ancestry Autoencoder is a tool to train variational autoencoder machine learning
 
 Run dev server
 ```
-fastapi dev backend/main.py
+fastapi dev backend/__main__.py
 ```
 
 Run tests
 ```
-pytest
+pytest -s
 ```
+"-s" is for capturing stdout during tests
 
+# TODO
+
+- [x] VCF Manager
+  - [x] load
+  - [x] check headers
+  - [x] check it is phased
+  - [x] method: get sample names
+  - [x] method: get phased genotypes
+  - [x] use it in api
+- [ ] Autoencoder lightining
+- [ ] add political entities to names for testing
+- [ ] return the latent space representations of samples by api
 
 # Usage
 
